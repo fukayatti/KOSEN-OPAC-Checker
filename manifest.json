@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "図書館で見る",
-  "version": "1.0",
-  "description": "Amazonの書籍ページに図書館の蔵書情報を表示します",
+  "name": "図書館で借りる",
+  "version": "1.1",
+  "description": "Amazon・楽天市場の書籍ページに図書館の蔵書情報を表示します",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
     "*://www.amazon.co.jp/*",
     "*://amazon.co.jp/*",
+    "*://books.rakuten.co.jp/*",
     "*://libopac-c.kosen-k.go.jp/*",
     "*://m.media-amazon.com/*"
   ],
@@ -15,6 +16,11 @@
       "matches": ["*://www.amazon.co.jp/*", "*://amazon.co.jp/*"],
       "js": ["content.js"],
       "run_at": "document_end"
+    },
+    {
+      "matches": ["*://books.rakuten.co.jp/*"],
+      "js": ["content-rakuten.js"],
+      "run_at": "document_end"
     }
   ],
   "background": {
@@ -22,7 +28,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "図書館で見る"
+    "default_title": "図書館で借りる"
   },
   "icons": {
     "16": "icons/icon16.png",

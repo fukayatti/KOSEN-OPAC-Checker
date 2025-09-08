@@ -134,32 +134,47 @@ document.addEventListener("DOMContentLoaded", function () {
 
       // アクティブなタブにメッセージを送信して設定を更新
       chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (tabs[0] && tabs[0].url && tabs[0].url.includes("amazon.co.jp")) {
-          console.log(
-            "ポップアップ: Amazonタブにメッセージ送信中...",
-            tabs[0].id
-          );
-          chrome.tabs.sendMessage(
-            tabs[0].id,
-            {
-              action: "updateCollegeId",
-              collegeId: selectedCollegeId,
-            },
-            function (response) {
-              if (chrome.runtime.lastError) {
-                console.error(
-                  "ポップアップ: メッセージ送信エラー:",
-                  chrome.runtime.lastError.message
-                );
-              } else {
-                console.log("ポップアップ: メッセージ送信成功:", response);
+        if (tabs[0] && tabs[0].url) {
+          const url = tabs[0].url;
+          let shouldSendMessage = false;
+
+          if (url.includes("amazon.co.jp")) {
+            console.log(
+              "ポップアップ: Amazonタブにメッセージ送信中...",
+              tabs[0].id
+            );
+            shouldSendMessage = true;
+          } else if (url.includes("books.rakuten.co.jp")) {
+            console.log(
+              "ポップアップ: 楽天ブックスタブにメッセージ送信中...",
+              tabs[0].id
+            );
+            shouldSendMessage = true;
+          }
+
+          if (shouldSendMessage) {
+            chrome.tabs.sendMessage(
+              tabs[0].id,
+              {
+                action: "updateCollegeId",
+                collegeId: selectedCollegeId,
+              },
+              function (response) {
+                if (chrome.runtime.lastError) {
+                  console.error(
+                    "ポップアップ: メッセージ送信エラー:",
+                    chrome.runtime.lastError.message
+                  );
+                } else {
+                  console.log("ポップアップ: メッセージ送信成功:", response);
+                }
               }
-            }
-          );
-        } else {
-          console.log(
-            "ポップアップ: Amazonページではないため、メッセージを送信しません"
-          );
+            );
+          } else {
+            console.log(
+              "ポップアップ: 対応サイトではないため、メッセージを送信しません"
+            );
+          }
         }
       });
     });
@@ -179,9 +194,16 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("currentPage").textContent =
         "Amazon (書籍ページではありません)";
       document.getElementById("status").style.color = "#b12704";
+    } else if (url.includes("books.rakuten.co.jp") && url.includes("/rb/")) {
+      document.getElementById("currentPage").textContent = "Rakuten ブックス";
+      document.getElementById("status").style.color = "#007600";
+    } else if (url.includes("books.rakuten.co.jp")) {
+      document.getElementById("currentPage").textContent =
+        "Rakuten ブックス (書籍ページではありません)";
+      document.getElementById("status").style.color = "#b12704";
     } else {
       document.getElementById("currentPage").textContent =
-        "Amazon ではありません";
+        "対応サイトではありません";
       document.getElementById("status").style.color = "#666";
     }
   });
