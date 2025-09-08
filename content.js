@@ -220,7 +220,18 @@ class LibraryFinder {
   }
 
   isBookPage() {
-    return document.querySelector("#productTitle, h1#title");
+    // nav-subnavでdata-category="books"が存在する場合のみ書籍ページとして認識
+    const navSubnav = document.querySelector(
+      '#nav-subnav[data-category="books"]'
+    );
+    const hasProductTitle = document.querySelector("#productTitle, h1#title");
+
+    console.log("📚 書籍ページチェック:", {
+      navSubnav: !!navSubnav,
+      hasProductTitle: !!hasProductTitle,
+    });
+
+    return navSubnav && hasProductTitle;
   }
 
   extractBookInfo() {
