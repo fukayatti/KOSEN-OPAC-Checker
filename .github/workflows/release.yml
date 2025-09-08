@@ -1,0 +1,137 @@
+name: Build and Release Chrome Extension
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "manifest.json"
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.check-version.outputs.version-changed }}
+      version: ${{ steps.check-version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if version changed
+        id: check-version
+        run: |
+          # 現在のバージョンを取得
+          CURRENT_VERSION=$(jq -r '.version' manifest.json)
+          echo "Current version: $CURRENT_VERSION"
+
+          # 前のコミットからバージョンを取得
+          git checkout HEAD~1 manifest.json 2>/dev/null || echo "No previous version found"
+          PREVIOUS_VERSION=$(jq -r '.version' manifest.json 2>/dev/null || echo "none")
+          echo "Previous version: $PREVIOUS_VERSION"
+
+          # 元のmanifest.jsonに戻す
+          git checkout HEAD manifest.json
+
+          # バージョンが変更されたかチェック
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "version-changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+          else
+            echo "version-changed=false" >> $GITHUB_OUTPUT
+            echo "Version unchanged: $CURRENT_VERSION"
+          fi
+
+  build-and-release:
+    needs: check-version
+    if: needs.check-version.outputs.version-changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: |
+          # web-ext をインストール（Mozilla のツールですが Chrome 拡張機能も扱えます）
+          npm install -g web-ext
+
+          # crx3 パッケージをインストール（Chrome拡張機能用）
+          npm install -g crx3
+
+      - name: Prepare extension files
+        run: |
+          # 拡張機能のファイルを一時ディレクトリにコピー
+          mkdir -p build
+          cp -r icons build/
+          cp manifest.json background.js content.js content-rakuten.js popup.html popup.js build/
+
+          # 不要なファイルを除外
+          rm -f build/README.md build/working_scraper.js 2>/dev/null || true
+
+      - name: Generate private key and create CRX
+        run: |
+          # プライベートキーを生成（リリース用）
+          openssl genrsa -out extension-key.pem 2048
+
+          # CRXファイルを作成
+          npx crx3 build/
+
+      - name: Create zip file
+        run: |
+          cd build
+          zip -r "../library-extension-${{ needs.check-version.outputs.version }}.zip" .
+          cd ..
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.check-version.outputs.version }}
+          release_name: Release v${{ needs.check-version.outputs.version }}
+          body: |
+            ## 図書館で借りる Chrome拡張機能 v${{ needs.check-version.outputs.version }}
+
+            ### インストール方法
+            1. `library-extension-${{ needs.check-version.outputs.version }}.zip` をダウンロード
+            2. ファイルを解凍
+            3. Chrome の拡張機能管理画面で「デベロッパーモード」を有効にする
+            4. 「パッケージ化されていない拡張機能を読み込む」から解凍したフォルダを選択
+
+            ### 変更内容
+            manifest.json のバージョンを ${{ needs.check-version.outputs.version }} に更新
+          draft: false
+          prerelease: false
+
+      - name: Upload ZIP to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./library-extension-${{ needs.check-version.outputs.version }}.zip
+          asset_name: library-extension-${{ needs.check-version.outputs.version }}.zip
+          asset_content_type: application/zip
+
+      - name: Upload CRX to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build.crx
+          asset_name: library-extension-${{ needs.check-version.outputs.version }}.crx
+          asset_content_type: application/x-chrome-extension
+
+      - name: Clean up
+        run: |
+          rm -f extension-key.pem
+          rm -rf build
