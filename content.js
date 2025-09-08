@@ -602,7 +602,7 @@ class LibraryFinder {
     const resultHTML = `
       <a href="${bookUrl}" target="_blank" class="library-finder-button library-finder-primary-style">
         <span class="library-finder-button-inner">
-          <span class="library-finder-button-text">図書館で見る</span>
+          <span class="library-finder-button-text">図書館で借りる</span>
         </span>
       </a>
     `;
