@@ -3,23 +3,17 @@
   "name": "図書館で見る",
   "version": "1.0",
   "description": "Amazonの書籍ページに図書館の蔵書情報を表示します",
-  "permissions": [
-    "activeTab",
-    "storage"
-  ],
+  "permissions": ["activeTab", "storage"],
   "host_permissions": [
     "*://www.amazon.co.jp/*",
     "*://amazon.co.jp/*",
-    "*://libopac-c.kosen-k.go.jp/*"
+    "*://libopac-c.kosen-k.go.jp/*",
+    "*://m.media-amazon.com/*"
   ],
   "content_scripts": [
     {
-      "matches": [
-        "*://www.amazon.co.jp/*",
-        "*://amazon.co.jp/*"
-      ],
+      "matches": ["*://www.amazon.co.jp/*", "*://amazon.co.jp/*"],
       "js": ["content.js"],
-      "css": ["content.css"],
       "run_at": "document_end"
     }
   ],

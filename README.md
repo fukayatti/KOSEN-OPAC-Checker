@@ -1,14 +1,35 @@
-# 図書館で見る - Chrome拡張機能
+# 図書館で見る - Chrome 拡張機能
 
 Amazon の書籍ページに図書館の蔵書情報を自動的に表示する Chrome 拡張機能です。
 
 ## 🚀 機能
 
 - **自動検索**: Amazon の書籍ページを開くと、自動的に図書館の蔵書を検索
-- **ISBN検索**: 正確な書籍情報で検索
-- **Amazon風UI**: Amazon のデザインに溶け込むような表示
-- **Keepa風配置**: 価格情報の近くに自然に配置
+- **ISBN 検索**: 正確な書籍情報で検索
+- **Amazon 風 UI**: Amazon の公式スタイルシートを組み込んだネイティブなデザイン
+- **「今すぐ買う」ボタンの下に配置**: 自然な位置に「📚 図書館で見る」ボタンを表示
+- **Keepa 風詳細情報**: 価格情報エリアに詳細な図書館情報を表示
 - **ワンクリックアクセス**: 図書館の詳細ページに直接リンク
+
+## 🎨 デザインの特徴
+
+### Amazon 公式スタイル完全再現
+
+- 指定された Amazon の公式 CSS（[ユーザー指定 URL](https://m.media-amazon.com/images/I/11VHci0R+LL._RC%7C01WLKcGdVeL.css,...)）を動的に読み込み
+- `a-button`、`a-button-primary`クラスを完全に再現
+- 本物の Amazon ボタンと見分けがつかないほど自然な統合
+
+### ボタンスタイル
+
+- **標準スタイル**: 黄色のグラデーション（Amazon 標準）
+- **プライマリスタイル**: 青色のグラデーション（「今すぐ買う」と同様）
+- **完全なホバー・アクティブ・フォーカス効果**
+
+### 配置戦略
+
+1. 「今すぐ買う」ボタンの直後（最優先）
+2. 「カートに入れる」ボタンの直後（フォールバック）
+3. 購入エリア内の適切な位置（最終フォールバック）
 
 ## 📦 インストール方法
 
@@ -19,18 +40,19 @@ Amazon の書籍ページに図書館の蔵書情報を自動的に表示する 
 3. `chrome://extensions/` にアクセス
 4. 右上の「デベロッパーモード」を有効にする
 5. 「パッケージ化されていない拡張機能を読み込む」をクリック
-6. `chrome-extension` フォルダを選択
+6. `Library` フォルダを選択（プロジェクトのルートディレクトリ）
 
 ## 🎯 使用方法
 
 1. Amazon.co.jp の書籍ページにアクセス
 2. ページが読み込まれると、自動的に図書館の蔵書を検索
-3. 結果が価格情報の近くに表示されます：
-   - ✅ **図書館にあります！**: 蔵書がある場合
-   - ❌ **図書館にはありません**: 蔵書がない場合
-   - ⚠️ **エラー**: 検索に問題がある場合
+3. 「今すぐ買う」ボタンの下に図書館ボタンが表示されます：
 
-4. 「図書館で確認する」ボタンから詳細ページにアクセス
+   - 📚 **図書館で見る（青色）**: 蔵書がある場合
+   - 🔍 **図書館で検索（黄色）**: 蔵書がない場合、図書館サイトで直接検索
+
+4. 価格情報エリアに Keepa 風の詳細情報も表示
+5. ボタンをクリックして図書館サイトにアクセス
 
 ## 📋 対応サイト
 
@@ -42,40 +64,113 @@ Amazon の書籍ページに図書館の蔵書情報を自動的に表示する 
 ### ファイル構成
 
 ```text
-chrome-extension/
+Library/
 ├── manifest.json          # 拡張機能の設定
 ├── content.js             # Amazon ページに注入されるスクリプト
-├── content.css            # UI スタイル
+├── content.css            # UI スタイル（Amazon完全準拠）
 ├── background.js          # バックグラウンドでの検索処理
 ├── popup.html             # 拡張機能ポップアップ
-└── icons/                 # アイコンファイル
-    ├── icon16.png
-    ├── icon48.png
-    └── icon128.png
+├── test-amazon-ui.html    # UIテスト用ページ
+├── icons/                 # アイコンファイル
+│   ├── icon16.png
+│   ├── icon48.png
+│   └── icon128.png
+├── working_scraper.js     # 元のスクレイピングスクリプト
+└── sample.html            # 検索結果のサンプルHTML
 ```
 
-### 検索ロジック
+### Amazon CSS 統合
 
-1. **ISBN検索（優先）**:
+拡張機能は以下の順序でスタイルを適用します：
+
+1. **Amazon 公式 CSS 読み込み**: 指定された URL から動的に読み込み
+2. **拡張機能 CSS 適用**: `content.css`で Amazon スタイルを完全再現
+3. **JavaScript 強制適用**: `applyAmazonButtonStyles()`で確実にスタイル適用
+
+```javascript
+// 使用されるAmazon公式CSS URL
+const amazonCSSUrl = "https://m.media-amazon.com/images/I/11VHci0R+LL._RC%7C...";
+
+// 適用されるクラス
+.library-finder-amazon-native          // 基本のAmazonボタンスタイル
+.library-finder-amazon-primary         // プライマリスタイル（青色）
+.a-button .a-button-inner .a-button-input .a-button-text  // Amazon公式クラス
+```
+
+### 検索ロジック（フォールバック戦略）
+
+1. **ISBN 検索（最優先）**:
+
    - ISBN-13 または ISBN-10 を抽出
    - WebOPAC の詳細検索 API を使用
+   - 最も正確な検索方法
 
-2. **キーワード検索（フォールバック）**:
-   - タイトル + 著者名で検索
-   - 結果の精度を高めるため正規化処理
+2. **タイトル全文検索（フォールバック 1）**:
 
-### 表示位置
+   - ISBN 検索で見つからない場合
+   - 書籍タイトルをそのまま使用
+   - Amazon 固有の文言のみ除去
 
-- Amazon の価格情報セクションの下
-- Keepa 等の他の拡張機能と類似の位置
-- レスポンシブ対応
+3. **メインタイトル+著者検索（フォールバック 2）**:
+
+   - タイトル全文検索で見つからない場合
+   - タイトルの最初の区切り文字まで + 主著者名
+   - より精密な検索クエリ
+
+4. **段階的精度調整**:
+   - 各段階で検索精度を調整
+   - 検索結果が 0 件の場合、次の戦略に移行
+   - 全戦略失敗時は「見つからない」と判定
+
+### UI 表示戦略
+
+#### デュアルコンテナアーキテクチャ
+
+1. **ボタンコンテナ**: 購入ボタンエリアに図書館ボタンを配置
+2. **詳細コンテナ**: Keepa 風の詳細情報を価格情報エリアに配置
+
+#### ボタン配置の優先順位
+
+```javascript
+// 1. 「今すぐ買う」ボタンの直後
+const buyNowSelectors = [
+  "#buy-now-button",
+  'input[name="submit.buy-now"]',
+  '.a-button-input[aria-labelledby="buy-now-button-announce"]',
+];
+
+// 2. 「カートに入れる」ボタンの直後
+const cartSelectors = [
+  "#add-to-cart-button",
+  'input[name="submit.add-to-cart"]',
+];
+
+// 3. 購入エリア内の適切な位置
+const buyBoxSelectors = ["#buyBoxInner", "#buyBoxAccordion"];
+```
 
 ## 🎨 UI デザイン
 
-- Amazon のデザインガイドラインに準拠
-- グラデーション背景とボタンスタイル
-- 角丸とシャドウでモダンな見た目
-- モバイル対応
+### Amazon ネイティブスタイル
+
+- Amazon 公式 CSS の完全統合
+- `a-button`クラスの正確な再現
+- グラデーション、ボーダー、シャドウの完全一致
+- フォント（Amazon Ember）の使用
+
+### レスポンシブ対応
+
+- モバイル・タブレット・デスクトップ対応
+- Amazon の既存 UI に完全に適合
+- スクロールバーやコンテナサイズも Amazon に準拠
+
+### UI テスト
+
+`test-amazon-ui.html` でスタイルのテストが可能：
+
+- Amazon 公式 CSS の読み込みテスト
+- 図書館ボタンのスタイルテスト
+- Keepa 風詳細表示のテスト
 
 ## ⚙️ 設定とカスタマイズ
 
@@ -83,7 +178,14 @@ chrome-extension/
 
 ```javascript
 // 図書館システムのURL
-const LIBRARY_BASE_URL = 'https://libopac-c.kosen-k.go.jp/webopac12/';
+const LIBRARY_BASE_URL = "https://libopac-c.kosen-k.go.jp/webopac12/";
+```
+
+Amazon CSS の URL を変更したい場合は、`content.js` の以下の部分を編集：
+
+```javascript
+const amazonCSSUrl =
+  "https://m.media-amazon.com/images/I/11VHci0R+LL._RC%7C...";
 ```
 
 ## 🔒 プライバシー
@@ -92,6 +194,7 @@ const LIBRARY_BASE_URL = 'https://libopac-c.kosen-k.go.jp/webopac12/';
 - 個人情報は収集しません
 - 検索履歴は保存しません
 - 全ての通信は HTTPS で暗号化
+- Amazon 公式 CSS は外部から安全に読み込み
 
 ## 🐛 トラブルシューティング
 
@@ -101,6 +204,12 @@ const LIBRARY_BASE_URL = 'https://libopac-c.kosen-k.go.jp/webopac12/';
 2. デベロッパーツールでエラーがないか確認
 3. 拡張機能が有効になっているか確認
 
+### ボタンのスタイルが正しくない
+
+1. Amazon 公式 CSS の読み込み状況を確認
+2. `test-amazon-ui.html` でスタイルテストを実行
+3. コンソールで CSS 読み込みエラーがないか確認
+
 ### 検索結果が表示されない
 
 1. ISBN が正しく抽出されているか確認
@@ -109,9 +218,27 @@ const LIBRARY_BASE_URL = 'https://libopac-c.kosen-k.go.jp/webopac12/';
 
 ### デバッグ方法
 
+検索とスタイルのデバッグ情報を確認するには：
+
 ```javascript
-// コンソールでデバッグ情報を確認
-console.log('LibraryFinder Debug Info');
+// Chromeのデベロッパーツールで確認
+// 1. Amazon書籍ページでF12を押す
+// 2. Consoleタブを開く
+// 3. 以下のような情報が表示されます
+
+// CSS読み込み状況
+"🎨 指定されたAmazonのネイティブCSSを読み込みました"
+"✅ AmazonCSS読み込み完了 - a-buttonスタイルが利用可能"
+
+// 書籍情報抽出
+"抽出された書籍情報: {title: '...', author: '...', isbn13: '...'}"
+
+// ボタン配置
+"📚 図書館ボタンを「今すぐ買う」ボタン (#buy-now-button) の直後に挿入しました"
+
+// 検索試行履歴
+"🔍 戦略1: ISBN検索を試行中..."
+"✅ ISBN検索成功" または "⚠️ ISBN検索失敗、フォールバック実行"
 ```
 
 ## 📝 開発
@@ -123,6 +250,15 @@ console.log('LibraryFinder Debug Info');
 - 同一の検索ロジック
 - 同一の HTML 解析処理
 - Chrome 拡張機能として再実装
+- Amazon 公式スタイルの完全統合
+
+### 今回の主な改善点
+
+1. **Amazon 公式 CSS 統合**: 指定されたスタイルシートの動的読み込み
+2. **ネイティブボタンスタイル**: `a-button`クラスの完全再現
+3. **配置戦略改善**: 「今すぐ買う」ボタンの直後への精密配置
+4. **デュアル UI**: ボタンと詳細情報の分離配置
+5. **UI テストページ**: スタイルテスト用ページの追加
 
 ### 更新と改善
 
@@ -130,6 +266,7 @@ console.log('LibraryFinder Debug Info');
 - 検索精度の向上
 - UI/UX の改善
 - 設定画面の追加
+- 他の Amazon スタイルシート URL への対応
 
 ## 📄 ライセンス
 
