@@ -417,7 +417,7 @@ class RakutenLibraryFinder {
     this.buttonContainer.className = "library-finder-button-container";
     this.buttonContainer.innerHTML = `
       <button class="library-finder-button rakuten-style" id="library-finder-search-btn">
-        図書館で見る
+        図書館で借りる
       </button>
     `;
 
@@ -735,7 +735,7 @@ class RakutenLibraryFinder {
     const resultHTML = `
       <a href="${bookUrl}" target="_blank" class="library-finder-button library-finder-primary-style">
         <span class="library-finder-button-inner">
-          <span class="library-finder-button-text">図書館で見る</span>
+          <span class="library-finder-button-text">図書館で借りる</span>
         </span>
       </a>
     `;
