@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("status").style.color = "#007600";
     } else if (url.includes("books.rakuten.co.jp")) {
       document.getElementById("currentPage").textContent =
-        "Rakuten ブックス (書籍ページではありません)";
+        "楽天ブックス (書籍ページではありません)";
       document.getElementById("status").style.color = "#b12704";
     } else {
       document.getElementById("currentPage").textContent =
