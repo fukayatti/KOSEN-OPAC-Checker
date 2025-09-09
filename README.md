@@ -1,12 +1,12 @@
 # KOSEN-OPAC-Checker
 
-![alt text](icons/icon1024.png)
+![alt text](assets/logo.png)
 
 Amazon・楽天ブックスの書籍ページに全国の高専図書館の蔵書情報を自動的に表示する Chrome 拡張機能です。
 
 <div style="display: flex; gap: 10px;">
-   <img src="image.png" alt="alt text" style="flex: 1; max-width: 50%;">
-   <img src="image-1.png" alt="alt text" style="flex: 1; max-width: 50%;">
+   <img src="assets/amazon-sample.png" alt="Amazon Sample" style="flex: 1; max-width: 50%;">
+   <img src="assets/rakuten-sample.png" alt="Rakuten Sample" style="flex: 1; max-width: 50%;">
 </div>
 
 ## 機能
