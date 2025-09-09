@@ -1,4 +1,4 @@
-# 図書館で借りる - Chrome 拡張機能
+# KOSEN-OPAC-Checker
 
 Amazon・楽天ブックスの書籍ページに図書館の蔵書情報を自動的に表示する Chrome 拡張機能です。
 

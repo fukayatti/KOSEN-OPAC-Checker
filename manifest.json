@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "図書館で借りる",
+  "name": "KOSEN-OPAC-Checker",
   "version": "1.2",
   "description": "Amazon・楽天市場の書籍ページに図書館の蔵書情報を表示します",
   "permissions": ["activeTab", "storage"],
@@ -28,7 +28,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "図書館で借りる"
+    "default_title": "KOSEN-OPAC-Checker"
   },
   "icons": {
     "16": "icons/icon16.png",
