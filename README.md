@@ -4,10 +4,7 @@
 
 Amazon・楽天ブックスの書籍ページに全国の高専図書館の蔵書情報を自動的に表示する Chrome 拡張機能です。
 
-<div style="display: flex; gap: 10px;">
-   <img src="assets/amazon-sample.png" alt="Amazon Sample" style="flex: 1; max-width: 50%;">
-   <img src="assets/rakuten-sample.png" alt="Rakuten Sample" style="flex: 1; max-width: 50%;">
-</div>
+![rakuten](assets/rakuten-sample.png)
 
 ## 機能
 
