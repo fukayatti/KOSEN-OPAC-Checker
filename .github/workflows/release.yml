@@ -86,7 +86,7 @@ jobs:
       - name: Create zip file
         run: |
           cd build
-          zip -r "../library-extension-${{ needs.check-version.outputs.version }}.zip" .
+          zip -r "../KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.zip" .
           cd ..
 
       - name: Create Release
@@ -98,10 +98,10 @@ jobs:
           tag_name: v${{ needs.check-version.outputs.version }}
           release_name: Release v${{ needs.check-version.outputs.version }}
           body: |
-            ## 図書館で借りる Chrome拡張機能 v${{ needs.check-version.outputs.version }}
+            ## KOSEN-OPAC-Checker ${{ needs.check-version.outputs.version }}
 
             ### インストール方法
-            1. `library-extension-${{ needs.check-version.outputs.version }}.zip` をダウンロード
+            1. `KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.zip` をダウンロード
             2. ファイルを解凍
             3. Chrome の拡張機能管理画面で「デベロッパーモード」を有効にする
             4. 「パッケージ化されていない拡張機能を読み込む」から解凍したフォルダを選択
@@ -117,8 +117,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./library-extension-${{ needs.check-version.outputs.version }}.zip
-          asset_name: library-extension-${{ needs.check-version.outputs.version }}.zip
+          asset_path: ./KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.zip
+          asset_name: KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.zip
           asset_content_type: application/zip
 
       - name: Upload CRX to Release
@@ -128,7 +128,7 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./build.crx
-          asset_name: library-extension-${{ needs.check-version.outputs.version }}.crx
+          asset_name: KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.crx
           asset_content_type: application/x-chrome-extension
 
       - name: Clean up
