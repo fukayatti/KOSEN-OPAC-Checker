@@ -170,6 +170,34 @@ KOSEN-OPAC-Checker/
    - 検索結果が 0 件の場合、次の戦略に移行
    - 全戦略失敗時は「見つからない」と判定
 
+```mermaid
+flowchart LR
+   A[書籍ページ<br/>読み込み] --> B[ISBN-13<br/>抽出]
+   B --> C{ISBN検索<br/>実行}
+
+   C -->|Yes| E[図書館で<br/>借りる]
+   C -->|No| F{タイトル全文<br/>検索実行}
+
+   F -->|Yes| E
+   F -->|No| H{メインタイトル<br/>+著者検索実行}
+
+   H -->|Yes| E
+   H -->|No| J[図書館には<br/>ありません]
+
+   E --> K[図書館詳細<br/>ページへリンク]
+   J --> L[検索終了]
+
+   style A fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff
+   style B fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff
+   style C fill:#f39c12,stroke:#e67e22,stroke-width:2px,color:#fff
+   style E fill:#27ae60,stroke:#229954,stroke-width:2px,color:#fff
+   style F fill:#f39c12,stroke:#e67e22,stroke-width:2px,color:#fff
+   style H fill:#f39c12,stroke:#e67e22,stroke-width:2px,color:#fff
+   style J fill:#e74c3c,stroke:#c0392b,stroke-width:2px,color:#fff
+   style K fill:#16a085,stroke:#138d75,stroke-width:2px,color:#fff
+   style L fill:#95a5a6,stroke:#7f8c8d,stroke-width:2px,color:#fff
+```
+
 ### UI 表示
 
 #### Amazon
