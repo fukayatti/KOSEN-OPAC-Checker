@@ -111,28 +111,32 @@ class LibrarySearchService {
     console.log("🎯 handleLibrarySearch開始 - リクエスト受信:", request);
 
     try {
-      let { isbn, bookInfo, collegeId = "12" } = request;
+      const { isbn, bookInfo, collegeId = "12" } = request;
       console.log("📚 抽出されたデータ:", { isbn, bookInfo, collegeId });
 
       let result = null;
       let searchAttempts = [];
 
-      // 戦略0: ページからISBNが取れなかった場合、NDLサーチで補完
-      if (!isbn && bookInfo.title) {
-        console.log("🔍 戦略0: NDLサーチでISBN補完を試行中...");
+      // ページから取れたISBNに加え、取れなかった／外れた場合に備えて
+      // NDLサーチから複数版のISBN候補を補完する（教科書などは版違いが多いため）
+      let isbnCandidates = isbn ? [isbn] : [];
+      if (bookInfo.title) {
+        console.log("🔍 戦略0: NDLサーチでISBN候補を補完中...");
         try {
-          const resolvedIsbn = await this.resolveISBNViaNDL(
+          const ndlCandidates = await this.resolveISBNCandidatesViaNDL(
             bookInfo.title,
             bookInfo.author
           );
           searchAttempts.push({
             type: "NDL補完",
             query: bookInfo.title,
-            success: !!resolvedIsbn,
+            success: ndlCandidates.length > 0,
+            candidates: ndlCandidates,
           });
-          if (resolvedIsbn) {
-            console.log("✅ NDLサーチでISBN取得:", resolvedIsbn);
-            isbn = resolvedIsbn;
+          for (const candidate of ndlCandidates) {
+            if (!isbnCandidates.includes(candidate)) {
+              isbnCandidates.push(candidate);
+            }
           }
         } catch (error) {
           console.warn("NDLサーチエラー:", error.message);
@@ -145,15 +149,14 @@ class LibrarySearchService {
         }
       }
 
-      // フォールバック検索戦略
-      if (isbn) {
-        // 戦略1: ISBN検索
-        console.log("🔍 戦略1: ISBN検索を試行中...");
+      // 戦略1: ISBN検索（ページ由来 + NDL補完の候補を順に試す）
+      for (const candidateIsbn of isbnCandidates) {
+        console.log("🔍 戦略1: ISBN検索を試行中...", candidateIsbn);
         try {
-          result = await this.searchByISBN(isbn, collegeId);
+          result = await this.searchByISBN(candidateIsbn, collegeId);
           searchAttempts.push({
             type: "ISBN",
-            query: isbn,
+            query: candidateIsbn,
             success: result.found,
           });
 
@@ -168,7 +171,7 @@ class LibrarySearchService {
           console.warn("ISBN検索エラー:", error.message);
           searchAttempts.push({
             type: "ISBN",
-            query: isbn,
+            query: candidateIsbn,
             success: false,
             error: error.message,
           });
@@ -257,10 +260,10 @@ class LibrarySearchService {
     }
   }
 
-  async resolveISBNViaNDL(title, author) {
-    console.log("📡 NDLサーチでISBN補完:", { title, author });
+  async resolveISBNCandidatesViaNDL(title, author) {
+    console.log("📡 NDLサーチでISBN候補を補完:", { title, author });
 
-    const params = new URLSearchParams({ title: title.trim(), cnt: "3" });
+    const params = new URLSearchParams({ title: title.trim(), cnt: "5" });
     if (author) {
       params.set("creator", author.trim());
     }
@@ -274,18 +277,17 @@ class LibrarySearchService {
     }
 
     const xml = await response.text();
-    const match = xml.match(
-      /<dc:identifier xsi:type="dcndl:ISBN">([\d\-]+)<\/dc:identifier>/
-    );
+    const matches = [
+      ...xml.matchAll(
+        /<dc:identifier xsi:type="dcndl:ISBN">([\d\-]+)<\/dc:identifier>/g
+      ),
+    ];
 
-    if (!match) {
-      console.log("📡 NDLサーチでISBNが見つかりませんでした");
-      return null;
-    }
+    // 同じ版がハイフンあり/なしの両表記で入っていることがあるため正規化して重複除去
+    const candidates = [...new Set(matches.map((m) => m[1].replace(/-/g, "")))];
 
-    const isbn = match[1].replace(/-/g, "");
-    console.log("📡 NDLサーチISBN抽出成功:", isbn);
-    return isbn;
+    console.log("📡 NDLサーチISBN候補:", candidates);
+    return candidates;
   }
 
   async searchByISBN(isbn, collegeId = "12") {
