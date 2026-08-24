@@ -151,7 +151,28 @@ class RakutenLibraryFinder {
       .library-finder-primary-style:active * {
         color: #ffffff !important;
       }
-      
+
+      /* 貸出中ボタン風（オレンジ寄りの警告色） */
+      .library-finder-warning-style {
+        background: #e67e22;
+        color: #ffffff !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border: 1px solid #ca6f1e;
+      }
+
+      .library-finder-warning-style * {
+        color: #ffffff !important;
+      }
+
+      .library-finder-warning-style:hover {
+        background: #f39c12;
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+      }
+
+      .library-finder-warning-style:active {
+        background: #ca6f1e;
+      }
+
       /* 無効/検索中スタイル */
       .library-finder-disabled {
         background: #f0f0f0;
@@ -756,7 +777,11 @@ class RakutenLibraryFinder {
     // bibIdまたはidプロパティをチェック
     const bookId = books[0].bibId || books[0].id;
     if (bookId && bookId.startsWith("BB")) {
-      bookUrl = `https://libopac-c.kosen-k.go.jp/webopac${this.collegeId}/${bookId}`;
+      // 「webopacXX/BBxxxxx」という一見きれいなURLは実在せず404になるため、
+      // 実際に書誌詳細を表示するcatdbl.doエンドポイントを使う
+      bookUrl = `https://libopac-c.kosen-k.go.jp/webopac${
+        this.collegeId
+      }/catdbl.do?bibid=${encodeURIComponent(bookId)}`;
       console.log("📚 BBIDを使用したURL生成:", bookUrl);
       console.log("📚 使用したID:", bookId);
       console.log("📚 使用した高専ID:", this.collegeId);
@@ -768,12 +793,24 @@ class RakutenLibraryFinder {
       console.log("📚 フォールバックURLを使用:", bookUrl);
     }
 
+    const holdingsSummary = this.getHoldingsSummary(books[0].holdings);
+    let buttonStyle = "library-finder-primary-style";
+    let buttonText = "図書館で借りる";
+    if (holdingsSummary && !holdingsSummary.available) {
+      buttonStyle = "library-finder-warning-style";
+      buttonText = holdingsSummary.nextDueDate
+        ? `貸出中（返却予定 ${holdingsSummary.nextDueDate}）`
+        : "貸出中";
+    }
+
     const resultHTML = `
       <a href="${escapeHTML(
         bookUrl
-      )}" target="_blank" class="library-finder-button library-finder-primary-style">
+      )}" target="_blank" class="library-finder-button ${buttonStyle}">
         <span class="library-finder-button-inner">
-          <span class="library-finder-button-text">図書館で借りる</span>
+          <span class="library-finder-button-text">${escapeHTML(
+            buttonText
+          )}</span>
         </span>
       </a>
     `;
@@ -826,6 +863,48 @@ class RakutenLibraryFinder {
     this.detailsContainer.style.display = "none";
   }
 
+  getHoldingsSummary(holdings) {
+    if (!holdings || holdings.length === 0) {
+      return null;
+    }
+
+    const available = holdings.filter((copy) => !copy.onLoan);
+    if (available.length > 0) {
+      return { available: true };
+    }
+
+    const dueDates = holdings.map((copy) => copy.dueDate).filter(Boolean).sort();
+    return { available: false, nextDueDate: dueDates[0] || null };
+  }
+
+  getHoldingsHTML(holdings) {
+    if (!holdings || holdings.length === 0) {
+      return "";
+    }
+
+    const items = holdings
+      .map((copy) => {
+        const statusText = copy.onLoan
+          ? `貸出中${copy.dueDate ? `（返却予定 ${copy.dueDate}）` : ""}`
+          : "貸出可";
+        const statusColor = copy.onLoan ? "#e67e22" : "#27ae60";
+        const detailParts = [copy.location, copy.callNumber]
+          .filter(Boolean)
+          .map((part) => escapeHTML(part));
+
+        return `
+          <li style="margin-bottom:4px;">
+            <span style="color:${statusColor}; font-weight:bold;">${escapeHTML(
+          statusText
+        )}</span>${detailParts.length ? " / " + detailParts.join(" / ") : ""}
+          </li>
+        `;
+      })
+      .join("");
+
+    return `<ul style="font-size:12px; margin: 8px 0 0 0; padding-left: 18px;">${items}</ul>`;
+  }
+
   getResultHTML(book) {
     console.log("📚 詳細表示用書籍データ:", book);
 
@@ -836,7 +915,11 @@ class RakutenLibraryFinder {
     console.log("📚 使用する高専ID:", this.collegeId);
 
     if (bookId && bookId.startsWith("BB")) {
-      bookUrl = `https://libopac-c.kosen-k.go.jp/webopac${this.collegeId}/${bookId}`;
+      // 「webopacXX/BBxxxxx」という一見きれいなURLは実在せず404になるため、
+      // 実際に書誌詳細を表示するcatdbl.doエンドポイントを使う
+      bookUrl = `https://libopac-c.kosen-k.go.jp/webopac${
+        this.collegeId
+      }/catdbl.do?bibid=${encodeURIComponent(bookId)}`;
       console.log("📚 詳細リンク用BBID URL生成:", bookUrl);
     } else if (book.url && book.url !== "undefined") {
       bookUrl = book.url;
@@ -853,6 +936,7 @@ class RakutenLibraryFinder {
         <p><strong>出版:</strong> ${escapeHTML(
           book.publisher || "不明"
         )} (${escapeHTML(book.year || "不明")})</p>
+        ${this.getHoldingsHTML(book.holdings)}
         <a href="${escapeHTML(bookUrl)}" target="_blank">詳細を見る</a>
       </div>
     `;
