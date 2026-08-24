@@ -183,7 +183,7 @@ class LibrarySearchService {
         console.log("🔍 戦略2: タイトル検索を試行中...");
         try {
           const fullTitleQuery = this.generateFullTitleQuery(bookInfo);
-          result = await this.searchByKeyword(fullTitleQuery, collegeId);
+          result = await this.searchByTitle(fullTitleQuery, collegeId);
           searchAttempts.push({
             type: "タイトル検索",
             query: fullTitleQuery,
@@ -296,6 +296,48 @@ class LibrarySearchService {
     const postData = new URLSearchParams({
       isbn_issn: isbn,
       search_mode: "advanced",
+      listcnt: "50",
+      startpos: "",
+      fromDsp: "catsre",
+      sortkey: "",
+      sorttype: "",
+    });
+
+    const response = await fetch(
+      `https://libopac-c.kosen-k.go.jp/webopac${collegeId}/ctlsrh.do`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+          Referer: `https://libopac-c.kosen-k.go.jp/webopac${collegeId}/cattab.do`,
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "ja,en-US;q=0.7,en;q=0.3",
+        },
+        body: postData,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const html = await response.text();
+    return this.parseSearchResults(html);
+  }
+
+  async searchByTitle(title, collegeId = "12") {
+    console.log("タイトル限定検索実行:", title, "高専ID:", collegeId);
+
+    // words（全項目横断）ではなく書名フィールド（srhclm1=title）に絞ることで
+    // 著者名や注記にたまたま同じ語が含まれるノイズを減らす
+    const postData = new URLSearchParams({
+      srhclm1: "title",
+      valclm1: title.trim(),
+      search_mode: "advanced",
+      holar: collegeId,
       listcnt: "50",
       startpos: "",
       fromDsp: "catsre",
