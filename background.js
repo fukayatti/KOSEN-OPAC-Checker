@@ -132,6 +132,7 @@ class LibrarySearchService {
           if (result.found && result.books.length > 0) {
             console.log("✅ ISBN検索成功");
             result.searchMethod = "ISBN検索";
+            await this.enrichWithHoldings(result.books, collegeId);
             console.log("📤 検索成功レスポンスを送信:", result);
             sendResponse(result);
             return;
@@ -162,6 +163,7 @@ class LibrarySearchService {
           if (result.found && result.books.length > 0) {
             console.log("✅ タイトル検索成功");
             result.searchMethod = "タイトル検索";
+            await this.enrichWithHoldings(result.books, collegeId);
             console.log("📤 タイトル検索成功レスポンスを送信:", result);
             sendResponse(result);
             return;
@@ -190,6 +192,7 @@ class LibrarySearchService {
           if (result.found && result.books.length > 0) {
             console.log("✅ 名前検索成功");
             result.searchMethod = "名前検索";
+            await this.enrichWithHoldings(result.books, collegeId);
             console.log("📤 名前検索成功レスポンスを送信:", result);
             sendResponse(result);
             return;
@@ -227,6 +230,90 @@ class LibrarySearchService {
       console.log("📤 エラーレスポンスを送信:", errorResponse);
       sendResponse(errorResponse);
     }
+  }
+
+  async enrichWithHoldings(books, collegeId) {
+    // 詳細ページへのリクエストが増えるため、上位数件のみ貸出状況を取得する
+    const MAX_HOLDINGS_LOOKUPS = 5;
+    const targets = books.filter((book) => book.bibId).slice(0, MAX_HOLDINGS_LOOKUPS);
+
+    await Promise.all(
+      targets.map(async (book) => {
+        try {
+          const holdings = await this.fetchHoldings(book.bibId, collegeId);
+          book.holdings = holdings.copies;
+        } catch (error) {
+          console.warn("📋 貸出状況取得エラー:", book.bibId, error.message);
+          book.holdings = null;
+        }
+      })
+    );
+  }
+
+  async fetchHoldings(bibId, collegeId = "12") {
+    console.log("📋 貸出状況取得:", bibId, "高専ID:", collegeId);
+
+    // 直前の検索と同じセッション（Cookie）で叩く必要がある。
+    // セッションが無い状態でcatdbl.doを直接叩くと、所蔵情報が空のテンプレートしか返らない。
+    const response = await fetch(
+      `https://libopac-c.kosen-k.go.jp/webopac${collegeId}/catdbl.do?bibid=${encodeURIComponent(
+        bibId
+      )}`,
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+          Referer: `https://libopac-c.kosen-k.go.jp/webopac${collegeId}/cattab.do`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const html = await response.text();
+    return this.parseHoldings(html);
+  }
+
+  parseHoldings(html) {
+    // 所蔵情報テーブルは横型(syozou_yoko)・縦型(syozou_tate)の2つが
+    // 同じ内容で並んでいることがあるため、最初の1つだけを対象にする
+    const tableMatch = html.match(
+      /<div class="opac_booksyozou_area[^"]*">\s*<table>([\s\S]*?)<\/table>/
+    );
+    if (!tableMatch) {
+      return { copies: [] };
+    }
+
+    const rows = [...tableMatch[1].matchAll(/<tr>([\s\S]*?)<\/tr>/g)]
+      .map((m) => m[1])
+      .filter((row) => !row.includes("<th"));
+
+    // 列の並びは No./巻号/所蔵館/配置場所/請求記号/資料ID/状態/コメント/返却予定日/予約
+    const copies = rows.map((row) => {
+      const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) =>
+        m[1]
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+      );
+
+      const [, , library, location, callNumber, itemId, status, , dueDate] =
+        cells;
+
+      return {
+        library: library || "",
+        location: location || "",
+        callNumber: callNumber || "",
+        itemId: itemId || "",
+        onLoan: status === "貸出中",
+        dueDate: dueDate || "",
+      };
+    });
+
+    console.log("📋 貸出状況パース結果:", copies);
+    return { copies };
   }
 
   async searchByISBN(isbn, collegeId = "12") {
