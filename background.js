@@ -111,11 +111,39 @@ class LibrarySearchService {
     console.log("🎯 handleLibrarySearch開始 - リクエスト受信:", request);
 
     try {
-      const { isbn, bookInfo, collegeId = "12" } = request;
+      let { isbn, bookInfo, collegeId = "12" } = request;
       console.log("📚 抽出されたデータ:", { isbn, bookInfo, collegeId });
 
       let result = null;
       let searchAttempts = [];
+
+      // 戦略0: ページからISBNが取れなかった場合、NDLサーチで補完
+      if (!isbn && bookInfo.title) {
+        console.log("🔍 戦略0: NDLサーチでISBN補完を試行中...");
+        try {
+          const resolvedIsbn = await this.resolveISBNViaNDL(
+            bookInfo.title,
+            bookInfo.author
+          );
+          searchAttempts.push({
+            type: "NDL補完",
+            query: bookInfo.title,
+            success: !!resolvedIsbn,
+          });
+          if (resolvedIsbn) {
+            console.log("✅ NDLサーチでISBN取得:", resolvedIsbn);
+            isbn = resolvedIsbn;
+          }
+        } catch (error) {
+          console.warn("NDLサーチエラー:", error.message);
+          searchAttempts.push({
+            type: "NDL補完",
+            query: bookInfo.title,
+            success: false,
+            error: error.message,
+          });
+        }
+      }
 
       // フォールバック検索戦略
       if (isbn) {
@@ -229,6 +257,37 @@ class LibrarySearchService {
     }
   }
 
+  async resolveISBNViaNDL(title, author) {
+    console.log("📡 NDLサーチでISBN補完:", { title, author });
+
+    const params = new URLSearchParams({ title: title.trim(), cnt: "3" });
+    if (author) {
+      params.set("creator", author.trim());
+    }
+
+    const response = await fetch(
+      `https://ndlsearch.ndl.go.jp/api/opensearch?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const xml = await response.text();
+    const match = xml.match(
+      /<dc:identifier xsi:type="dcndl:ISBN">([\d\-]+)<\/dc:identifier>/
+    );
+
+    if (!match) {
+      console.log("📡 NDLサーチでISBNが見つかりませんでした");
+      return null;
+    }
+
+    const isbn = match[1].replace(/-/g, "");
+    console.log("📡 NDLサーチISBN抽出成功:", isbn);
+    return isbn;
+  }
+
   async searchByISBN(isbn, collegeId = "12") {
     console.log("ISBN検索実行:", isbn, "高専ID:", collegeId);
 
@@ -272,7 +331,7 @@ class LibrarySearchService {
 
     const postData = new URLSearchParams({
       words: keyword.trim(),
-      holar: "12",
+      holar: collegeId,
       formkeyno: "",
       sortkey: "",
       sorttype: "",

@@ -9,7 +9,8 @@
     "*://amazon.co.jp/*",
     "*://books.rakuten.co.jp/*",
     "*://libopac-c.kosen-k.go.jp/*",
-    "*://m.media-amazon.com/*"
+    "*://m.media-amazon.com/*",
+    "*://ndlsearch.ndl.go.jp/*"
   ],
   "content_scripts": [
     {
