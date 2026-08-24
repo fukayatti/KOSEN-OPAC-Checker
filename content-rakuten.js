@@ -287,7 +287,7 @@ class RakutenLibraryFinder {
 
   extractBookInfo() {
     console.log("📖 楽天書籍情報抽出開始");
-    this.bookInfo = { title: null, author: null, isbn: null };
+    this.bookInfo = { title: null, author: null, isbn: null, year: null };
 
     // タイトル抽出（楽天の実際の構造に基づく）
     let titleText = "";
@@ -384,7 +384,31 @@ class RakutenLibraryFinder {
 
     // ISBN抽出
     this.extractISBN();
+    this.extractPublicationYear();
     console.log("📖 楽天最終的な書籍情報:", this.bookInfo);
+  }
+
+  extractPublicationYear() {
+    console.log("📖 楽天出版年抽出開始");
+    const pageText = document.body.textContent || "";
+
+    // 「発行年月：2012年06月」「発売日：2012/06/01」等の表記から西暦4桁を取得
+    const patterns = [
+      /発行年月[^:：0-9]*[:：][^0-9]*(\d{4})年/,
+      /発売日[^:：0-9]*[:：][^0-9]*(\d{4})[\/年]/,
+      /出版年月[^:：0-9]*[:：][^0-9]*(\d{4})[\/年]/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = pageText.match(pattern);
+      if (match) {
+        this.bookInfo.year = match[1];
+        console.log("📖 楽天出版年抽出成功:", this.bookInfo.year);
+        return;
+      }
+    }
+
+    console.log("📖 楽天出版年が見つかりませんでした");
   }
 
   extractISBN() {

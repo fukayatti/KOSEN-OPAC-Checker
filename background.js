@@ -117,15 +117,57 @@ class LibrarySearchService {
       let result = null;
       let searchAttempts = [];
 
-      // フォールバック検索戦略
-      if (isbn) {
-        // 戦略1: ISBN検索
-        console.log("🔍 戦略1: ISBN検索を試行中...");
+      // ページから取れたISBNに加え、取れなかった／外れた場合に備えて
+      // NDLサーチから複数版のISBN候補を補完する（教科書などは版違いが多いため）
+      let isbnCandidates = isbn ? [isbn] : [];
+      if (bookInfo.title) {
+        console.log("🔍 戦略0: NDLサーチでISBN候補を補完中...");
         try {
-          result = await this.searchByISBN(isbn, collegeId);
+          const ndlCandidates = await this.resolveISBNCandidatesViaNDL(
+            bookInfo.title,
+            bookInfo.author
+          );
+
+          // ページから出版年が分かっている場合、同じ出版年の版を優先して試す
+          // （教科書などは版によってISBNが異なり、NDLの1件目が別版のことがあるため）
+          const sortedCandidates = bookInfo.year
+            ? [...ndlCandidates].sort((a, b) => {
+                const aMatch = a.year === bookInfo.year ? 0 : 1;
+                const bMatch = b.year === bookInfo.year ? 0 : 1;
+                return aMatch - bMatch;
+              })
+            : ndlCandidates;
+
+          searchAttempts.push({
+            type: "NDL補完",
+            query: bookInfo.title,
+            success: sortedCandidates.length > 0,
+            candidates: sortedCandidates,
+          });
+          for (const candidate of sortedCandidates) {
+            if (!isbnCandidates.includes(candidate.isbn)) {
+              isbnCandidates.push(candidate.isbn);
+            }
+          }
+        } catch (error) {
+          console.warn("NDLサーチエラー:", error.message);
+          searchAttempts.push({
+            type: "NDL補完",
+            query: bookInfo.title,
+            success: false,
+            error: error.message,
+          });
+        }
+      }
+
+      // 戦略1: ISBN検索（ページ由来 + NDL補完の候補を順に試す）
+      for (const candidateIsbn of isbnCandidates) {
+        console.log("🔍 戦略1: ISBN検索を試行中...", candidateIsbn);
+        try {
+          result = await this.searchByISBN(candidateIsbn, collegeId);
           searchAttempts.push({
             type: "ISBN",
-            query: isbn,
+            query: candidateIsbn,
             success: result.found,
           });
 
@@ -141,7 +183,7 @@ class LibrarySearchService {
           console.warn("ISBN検索エラー:", error.message);
           searchAttempts.push({
             type: "ISBN",
-            query: isbn,
+            query: candidateIsbn,
             success: false,
             error: error.message,
           });
@@ -153,7 +195,7 @@ class LibrarySearchService {
         console.log("🔍 戦略2: タイトル検索を試行中...");
         try {
           const fullTitleQuery = this.generateFullTitleQuery(bookInfo);
-          result = await this.searchByKeyword(fullTitleQuery, collegeId);
+          result = await this.searchByTitle(fullTitleQuery, collegeId);
           searchAttempts.push({
             type: "タイトル検索",
             query: fullTitleQuery,
@@ -316,6 +358,50 @@ class LibrarySearchService {
     return { copies };
   }
 
+  async resolveISBNCandidatesViaNDL(title, author) {
+    console.log("📡 NDLサーチでISBN候補を補完:", { title, author });
+
+    const params = new URLSearchParams({ title: title.trim(), cnt: "5" });
+    if (author) {
+      params.set("creator", author.trim());
+    }
+
+    const response = await fetch(
+      `https://ndlsearch.ndl.go.jp/api/opensearch?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const xml = await response.text();
+    // <item>単位でISBNと出版年を対応付ける（版によって出版年が異なるため）
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(
+      (m) => m[1]
+    );
+
+    const candidates = [];
+    const seenIsbn = new Set();
+    for (const item of items) {
+      const isbnMatch = item.match(
+        /<dc:identifier xsi:type="dcndl:ISBN">([\d\-]+)<\/dc:identifier>/
+      );
+      if (!isbnMatch) continue;
+
+      const isbn = isbnMatch[1].replace(/-/g, "");
+      if (seenIsbn.has(isbn)) continue;
+      seenIsbn.add(isbn);
+
+      const yearMatch = item.match(
+        /<dc:date xsi:type="dcterms:W3CDTF">(\d{4})<\/dc:date>/
+      );
+      candidates.push({ isbn, year: yearMatch ? yearMatch[1] : null });
+    }
+
+    console.log("📡 NDLサーチISBN候補:", candidates);
+    return candidates;
+  }
+
   async searchByISBN(isbn, collegeId = "12") {
     console.log("ISBN検索実行:", isbn, "高専ID:", collegeId);
 
@@ -354,12 +440,54 @@ class LibrarySearchService {
     return this.parseSearchResults(html);
   }
 
+  async searchByTitle(title, collegeId = "12") {
+    console.log("タイトル限定検索実行:", title, "高専ID:", collegeId);
+
+    // words（全項目横断）ではなく書名フィールド（srhclm1=title）に絞ることで
+    // 著者名や注記にたまたま同じ語が含まれるノイズを減らす
+    const postData = new URLSearchParams({
+      srhclm1: "title",
+      valclm1: title.trim(),
+      search_mode: "advanced",
+      holar: collegeId,
+      listcnt: "50",
+      startpos: "",
+      fromDsp: "catsre",
+      sortkey: "",
+      sorttype: "",
+    });
+
+    const response = await fetch(
+      `https://libopac-c.kosen-k.go.jp/webopac${collegeId}/ctlsrh.do`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+          Referer: `https://libopac-c.kosen-k.go.jp/webopac${collegeId}/cattab.do`,
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "ja,en-US;q=0.7,en;q=0.3",
+        },
+        body: postData,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const html = await response.text();
+    return this.parseSearchResults(html);
+  }
+
   async searchByKeyword(keyword, collegeId = "12") {
     console.log("キーワード検索実行:", keyword, "高専ID:", collegeId);
 
     const postData = new URLSearchParams({
       words: keyword.trim(),
-      holar: "12",
+      holar: collegeId,
       formkeyno: "",
       sortkey: "",
       sorttype: "",

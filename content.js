@@ -266,7 +266,7 @@ class LibraryFinder {
 
   extractBookInfo() {
     console.log("📖 書籍情報抽出開始");
-    this.bookInfo = { title: null, author: null, isbn: null };
+    this.bookInfo = { title: null, author: null, isbn: null, year: null };
 
     const titleEl = document.querySelector("#productTitle, h1#title");
     if (titleEl) {
@@ -320,7 +320,26 @@ class LibraryFinder {
     }
 
     this.extractISBN();
+    this.extractPublicationYear();
     console.log("📖 最終的な書籍情報:", this.bookInfo);
+  }
+
+  extractPublicationYear() {
+    console.log("📖 出版年抽出開始");
+    const pageText = document.body.textContent || "";
+
+    // Product Detailsの「発売日 : 2022/4/22」のような表記から西暦4桁を取得
+    const match = pageText.match(
+      /発売日[^:：0-9]*[:：][^0-9]*(\d{4})\/\d{1,2}\/\d{1,2}/
+    );
+
+    if (match) {
+      this.bookInfo.year = match[1];
+      console.log("📖 出版年抽出成功:", this.bookInfo.year);
+      return;
+    }
+
+    console.log("📖 出版年が見つかりませんでした");
   }
 
   extractISBN() {
