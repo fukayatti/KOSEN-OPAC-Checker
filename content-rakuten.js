@@ -753,7 +753,11 @@ class RakutenLibraryFinder {
     // bibIdまたはidプロパティをチェック
     const bookId = books[0].bibId || books[0].id;
     if (bookId && bookId.startsWith("BB")) {
-      bookUrl = `https://libopac-c.kosen-k.go.jp/webopac${this.collegeId}/${bookId}`;
+      // 「webopacXX/BBxxxxx」という一見きれいなURLは実在せず404になるため、
+      // 実際に書誌詳細を表示するcatdbl.doエンドポイントを使う
+      bookUrl = `https://libopac-c.kosen-k.go.jp/webopac${
+        this.collegeId
+      }/catdbl.do?bibid=${encodeURIComponent(bookId)}`;
       console.log("📚 BBIDを使用したURL生成:", bookUrl);
       console.log("📚 使用したID:", bookId);
       console.log("📚 使用した高専ID:", this.collegeId);
@@ -887,7 +891,11 @@ class RakutenLibraryFinder {
     console.log("📚 使用する高専ID:", this.collegeId);
 
     if (bookId && bookId.startsWith("BB")) {
-      bookUrl = `https://libopac-c.kosen-k.go.jp/webopac${this.collegeId}/${bookId}`;
+      // 「webopacXX/BBxxxxx」という一見きれいなURLは実在せず404になるため、
+      // 実際に書誌詳細を表示するcatdbl.doエンドポイントを使う
+      bookUrl = `https://libopac-c.kosen-k.go.jp/webopac${
+        this.collegeId
+      }/catdbl.do?bibid=${encodeURIComponent(bookId)}`;
       console.log("📚 詳細リンク用BBID URL生成:", bookUrl);
     } else if (book.url && book.url !== "undefined") {
       bookUrl = book.url;
