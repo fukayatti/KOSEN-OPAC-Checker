@@ -1,4 +1,16 @@
 // 楽天市場書籍ページ用コンテンツスクリプト
+
+// OPAC/楽天から取得した動的な文字列をinnerHTMLに差し込む前にエスケープする
+function escapeHTML(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 class RakutenLibraryFinder {
   constructor() {
     this.buttonContainer = null;
@@ -733,7 +745,9 @@ class RakutenLibraryFinder {
     }
 
     const resultHTML = `
-      <a href="${bookUrl}" target="_blank" class="library-finder-button library-finder-primary-style">
+      <a href="${escapeHTML(
+        bookUrl
+      )}" target="_blank" class="library-finder-button library-finder-primary-style">
         <span class="library-finder-button-inner">
           <span class="library-finder-button-text">図書館で借りる</span>
         </span>
@@ -776,7 +790,9 @@ class RakutenLibraryFinder {
     const errorHTML = `
       <div class="library-finder-button library-finder-disabled">
         <span class="library-finder-button-inner">
-          <span class="library-finder-button-text" style="color: #e74c3c;">${message}</span>
+          <span class="library-finder-button-text" style="color: #e74c3c;">${escapeHTML(
+            message
+          )}</span>
         </span>
       </div>
     `;
@@ -808,12 +824,12 @@ class RakutenLibraryFinder {
 
     return `
       <div class="library-finder-result-item">
-        <h4>${book.title}</h4>
-        <p><strong>著者:</strong> ${book.author || "不明"}</p>
-        <p><strong>出版:</strong> ${book.publisher || "不明"} (${
-      book.year || "不明"
-    })</p>
-        <a href="${bookUrl}" target="_blank">詳細を見る</a>
+        <h4>${escapeHTML(book.title)}</h4>
+        <p><strong>著者:</strong> ${escapeHTML(book.author || "不明")}</p>
+        <p><strong>出版:</strong> ${escapeHTML(
+          book.publisher || "不明"
+        )} (${escapeHTML(book.year || "不明")})</p>
+        <a href="${escapeHTML(bookUrl)}" target="_blank">詳細を見る</a>
       </div>
     `;
   }
