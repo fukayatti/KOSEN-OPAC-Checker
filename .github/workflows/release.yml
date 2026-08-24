@@ -89,6 +89,35 @@ jobs:
           zip -r "../KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.zip" .
           cd ..
 
+      - name: Sign Firefox extension (XPI)
+        id: sign_firefox
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          # Mozilla Add-on API (AMO) の unlisted 署名を使って xpi を生成
+          # AMO_JWT_ISSUER / AMO_JWT_SECRET が未設定の場合はスキップする
+          if [ -z "$WEB_EXT_API_KEY" ] || [ -z "$WEB_EXT_API_SECRET" ]; then
+            echo "AMO_JWT_ISSUER / AMO_JWT_SECRET が未設定のため、XPI署名をスキップします"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          npx web-ext sign \
+            --source-dir=build \
+            --artifacts-dir=./web-ext-artifacts \
+            --channel=unlisted \
+            --api-key="$WEB_EXT_API_KEY" \
+            --api-secret="$WEB_EXT_API_SECRET"
+
+          XPI_PATH=$(find ./web-ext-artifacts -name '*.xpi' | head -n 1)
+          if [ -z "$XPI_PATH" ]; then
+            echo "署名済みXPIが見つかりませんでした" >&2
+            exit 1
+          fi
+          cp "$XPI_PATH" "./KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.xpi"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
       - name: Create Release
         uses: actions/create-release@v1
         id: create_release
@@ -100,11 +129,16 @@ jobs:
           body: |
             ## KOSEN-OPAC-Checker ${{ needs.check-version.outputs.version }}
 
-            ### インストール方法
+            ### インストール方法（Chrome / Chromium系）
             1. `KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.zip` をダウンロード
             2. ファイルを解凍
             3. Chrome の拡張機能管理画面で「デベロッパーモード」を有効にする
             4. 「パッケージ化されていない拡張機能を読み込む」から解凍したフォルダを選択
+
+            ### インストール方法（Firefox）
+            1. `KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.xpi` をダウンロード
+            2. Firefoxでダウンロードしたファイルを開く（またはFirefoxにドラッグ＆ドロップ）
+            3. 表示される確認ダイアログでインストールを許可
 
             ### 変更内容
             manifest.json のバージョンを ${{ needs.check-version.outputs.version }} に更新
@@ -131,7 +165,18 @@ jobs:
           asset_name: KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.crx
           asset_content_type: application/x-chrome-extension
 
+      - name: Upload XPI to Release
+        if: steps.sign_firefox.outputs.signed == 'true'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.xpi
+          asset_name: KOSEN-OPAC-Checker-${{ needs.check-version.outputs.version }}.xpi
+          asset_content_type: application/x-xpinstall
+
       - name: Clean up
         run: |
           rm -f extension-key.pem
-          rm -rf build
+          rm -rf build web-ext-artifacts
