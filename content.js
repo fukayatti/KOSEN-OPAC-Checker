@@ -1,4 +1,16 @@
 // コンテンツスクリプト - Amazonページに図書館情報を埋め込み
+
+// OPAC/Amazonから取得した動的な文字列をinnerHTMLに差し込む前にエスケープする
+function escapeHTML(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 class LibraryFinder {
   constructor() {
     this.buttonContainer = null;
@@ -600,7 +612,9 @@ class LibraryFinder {
     }
 
     const resultHTML = `
-      <a href="${bookUrl}" target="_blank" class="library-finder-button library-finder-primary-style">
+      <a href="${escapeHTML(
+        bookUrl
+      )}" target="_blank" class="library-finder-button library-finder-primary-style">
         <span class="library-finder-button-inner">
           <span class="library-finder-button-text">図書館で借りる</span>
         </span>
@@ -643,7 +657,9 @@ class LibraryFinder {
     const errorHTML = `
       <div class="library-finder-button library-finder-disabled">
         <span class="library-finder-button-inner">
-          <span class="library-finder-button-text" style="color: #d13212;">${message}</span>
+          <span class="library-finder-button-text" style="color: #d13212;">${escapeHTML(
+            message
+          )}</span>
         </span>
       </div>
     `;
@@ -675,14 +691,14 @@ class LibraryFinder {
 
     return `
       <div class="library-finder-result-item">
-        <h4 style="margin-top:0;">${book.title}</h4>
-        <p style="font-size:12px; margin-bottom: 5px;"><strong>著者:</strong> ${
+        <h4 style="margin-top:0;">${escapeHTML(book.title)}</h4>
+        <p style="font-size:12px; margin-bottom: 5px;"><strong>著者:</strong> ${escapeHTML(
           book.author || "不明"
-        }</p>
-        <p style="font-size:12px; margin-bottom: 10px;"><strong>出版:</strong> ${
+        )}</p>
+        <p style="font-size:12px; margin-bottom: 10px;"><strong>出版:</strong> ${escapeHTML(
           book.publisher || "不明"
-        } (${book.year || "不明"})</p>
-        <a href="${bookUrl}" target="_blank">詳細を見る</a>
+        )} (${escapeHTML(book.year || "不明")})</p>
+        <a href="${escapeHTML(bookUrl)}" target="_blank">詳細を見る</a>
       </div>
     `;
   }
