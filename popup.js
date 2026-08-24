@@ -1,6 +1,13 @@
 document.addEventListener("DOMContentLoaded", function () {
   console.log("ポップアップ: DOM読み込み完了");
 
+  // manifest.jsonから動的にバージョンを取得（表示のハードコードによるズレを防ぐ）
+  const versionFooterElement = document.getElementById("versionFooter");
+  if (versionFooterElement) {
+    const version = chrome.runtime.getManifest().version;
+    versionFooterElement.textContent = `v${version} - Amazon・楽天ブックス対応版`;
+  }
+
   // 高専ID一覧
   const colleges = {
     "01": "函館工業高等専門学校",
