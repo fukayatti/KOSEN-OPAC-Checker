@@ -127,15 +127,26 @@ class LibrarySearchService {
             bookInfo.title,
             bookInfo.author
           );
+
+          // ページから出版年が分かっている場合、同じ出版年の版を優先して試す
+          // （教科書などは版によってISBNが異なり、NDLの1件目が別版のことがあるため）
+          const sortedCandidates = bookInfo.year
+            ? [...ndlCandidates].sort((a, b) => {
+                const aMatch = a.year === bookInfo.year ? 0 : 1;
+                const bMatch = b.year === bookInfo.year ? 0 : 1;
+                return aMatch - bMatch;
+              })
+            : ndlCandidates;
+
           searchAttempts.push({
             type: "NDL補完",
             query: bookInfo.title,
-            success: ndlCandidates.length > 0,
-            candidates: ndlCandidates,
+            success: sortedCandidates.length > 0,
+            candidates: sortedCandidates,
           });
-          for (const candidate of ndlCandidates) {
-            if (!isbnCandidates.includes(candidate)) {
-              isbnCandidates.push(candidate);
+          for (const candidate of sortedCandidates) {
+            if (!isbnCandidates.includes(candidate.isbn)) {
+              isbnCandidates.push(candidate.isbn);
             }
           }
         } catch (error) {
@@ -277,14 +288,28 @@ class LibrarySearchService {
     }
 
     const xml = await response.text();
-    const matches = [
-      ...xml.matchAll(
-        /<dc:identifier xsi:type="dcndl:ISBN">([\d\-]+)<\/dc:identifier>/g
-      ),
-    ];
+    // <item>単位でISBNと出版年を対応付ける（版によって出版年が異なるため）
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(
+      (m) => m[1]
+    );
 
-    // 同じ版がハイフンあり/なしの両表記で入っていることがあるため正規化して重複除去
-    const candidates = [...new Set(matches.map((m) => m[1].replace(/-/g, "")))];
+    const candidates = [];
+    const seenIsbn = new Set();
+    for (const item of items) {
+      const isbnMatch = item.match(
+        /<dc:identifier xsi:type="dcndl:ISBN">([\d\-]+)<\/dc:identifier>/
+      );
+      if (!isbnMatch) continue;
+
+      const isbn = isbnMatch[1].replace(/-/g, "");
+      if (seenIsbn.has(isbn)) continue;
+      seenIsbn.add(isbn);
+
+      const yearMatch = item.match(
+        /<dc:date xsi:type="dcterms:W3CDTF">(\d{4})<\/dc:date>/
+      );
+      candidates.push({ isbn, year: yearMatch ? yearMatch[1] : null });
+    }
 
     console.log("📡 NDLサーチISBN候補:", candidates);
     return candidates;
